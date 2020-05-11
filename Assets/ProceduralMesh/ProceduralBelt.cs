@@ -36,15 +36,12 @@ public class ProceduralBelt : MonoBehaviour
 
         if (index == 0)
         { 
-            transform.position = pos;
             pos -= transform.position;
         } else
         {
             pos -= transform.position;
             pos = Vector3.forward * Vector3.Distance(transform.position, transform.position + pos);
         }
-
-        //axis = Vector3.right;
         
 
 

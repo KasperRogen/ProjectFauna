@@ -52,20 +52,22 @@ public class BeltBuilder : MonoBehaviour
                         BeltStartVector = connector.Pos;
                         _startHookedToConnector = true;
                         startHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                        BeltScript.SetPoint(0, startHookedConnector.Pos, startHookedConnector.Axis);
+                        Belt.transform.position = startHookedConnector.Pos;
+                        BeltScript.SetPoint(0, startHookedConnector.Pos, Belt.transform.InverseTransformDirection(startHookedConnector.Axis));
 
                     } else
                     {
                         BeltEndVector = connector.Pos;
                         _endHookedToConnector = true;
                         endHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                        BeltScript.SetPoint(1, endHookedConnector.Pos, endHookedConnector.Axis);
+                        BeltScript.SetPoint(1, endHookedConnector.Pos, Belt.transform.InverseTransformDirection(endHookedConnector.Axis));
                     }
                     
 
                 }
                 else
                 {
+                    Belt.transform.position = hit.point;
                     BeltScript.SetPoint(0, hit.point, Vector3.right);
                     BeltStartVector = hit.point;
                 }
@@ -79,45 +81,76 @@ public class BeltBuilder : MonoBehaviour
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, 10, GroundAndConnectorMask))
             {
-                BeltEndVector = hit.point;
-                Vector3 BeltDir = BeltEndVector - BeltStartVector;
-                
-                if(_startHookedToConnector && startHookedConnector.Type == ConnectorType.INPUT)
+                if(_endHookedToConnector && endHookedConnector.Type == ConnectorType.INPUT)
                 {
+                    BeltStartVector = hit.point;
+                    Vector3 BeltDir = BeltEndVector - BeltStartVector;
+                    Debug.DrawLine(BeltStartVector, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Color.magenta);
 
-                }
+                    if (hit.transform.GetComponent<BeltConnector>() != null)
+                    {
+                        BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
+                        BeltStartVector = connector.Pos;
+                        _startHookedToConnector = true;
+                        startHookedConnector = hit.transform.GetComponent<BeltConnector>();
+                        Belt.transform.position = startHookedConnector.Pos;
+                        BeltScript.SetPoint(0, startHookedConnector.Pos, Belt.transform.InverseTransformDirection(startHookedConnector.Axis));
+                    }
+                    else
+                    {
+                        _startHookedToConnector = false;
+                        startHookedConnector = null;
+                        Belt.transform.position = BeltEndVector - Belt.transform.forward * BeltDir.magnitude;
+                        BeltScript.SetPoint(0, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Vector3.right);
+                    }
 
-
-                if(hit.transform.GetComponent<BeltConnector>() != null)
-                {
-                    BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
-                    BeltEndVector = connector.Pos;
-                    _endHookedToConnector = true;
-                    endHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                    BeltScript.SetPoint(1, endHookedConnector.Pos, endHookedConnector.Axis);
                 } else
                 {
-                    _endHookedToConnector = false;
-                    endHookedConnector = null;
-                    BeltScript.SetPoint(1, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Vector3.right);
+
+
+                    BeltEndVector = hit.point;
+                    Vector3 BeltDir = BeltEndVector - BeltStartVector;
+
+                    if (hit.transform.GetComponent<BeltConnector>() != null)
+                    {
+                        BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
+                        BeltEndVector = connector.Pos;
+                        _endHookedToConnector = true;
+                        endHookedConnector = hit.transform.GetComponent<BeltConnector>();
+                        BeltScript.SetPoint(1, endHookedConnector.Pos, Belt.transform.InverseTransformDirection(endHookedConnector.Axis));
+                    }
+                    else
+                    {
+                        _endHookedToConnector = false;
+                        endHookedConnector = null;
+                        BeltScript.SetPoint(1, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Vector3.right);
+                    }
+
                 }
-
-
-
 
                 if (_startHookedToConnector)
                 {
                     Debug.DrawLine(transform.position, startHookedConnector.Pos, Color.red);
+                    Belt.transform.position = startHookedConnector.Pos;
                     BeltScript.SetPoint(0, startHookedConnector.Pos, Belt.transform.InverseTransformDirection(startHookedConnector.Axis));
-                } else
+                }
+                else
                 {
+                    Belt.transform.position = BeltStartVector;
                     BeltScript.SetPoint(0, BeltStartVector, Vector3.right);
+                }
+
+                if(_endHookedToConnector && endHookedConnector.Type == ConnectorType.INPUT)
+                {
+                    BeltScript.SetPoint(1, endHookedConnector.Pos, Belt.transform.InverseTransformDirection(endHookedConnector.Axis));
                 }
 
                 Debug.DrawLine(Vector3.zero, BeltStartVector);
                 Debug.DrawLine(Vector3.zero, BeltEndVector);
 
                 Belt.transform.LookAt(BeltEndVector);
+
+
             }
           
 
