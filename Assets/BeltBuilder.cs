@@ -1,11 +1,12 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 public class BeltBuilder : MonoBehaviour
 {
-
+    public float BeltHeight = 0.1f;
     public Material BeltMat;
 
     Vector3 BeltStartVector, BeltEndVector, BeltStartAxis, BeltEndAxis;
@@ -36,14 +37,11 @@ public class BeltBuilder : MonoBehaviour
         Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
         if (Input.GetMouseButtonDown(0))
         {
-            Belt = Instantiate(BeltPrefab);
-            Belt.GetComponent<Renderer>().material = BeltMat;
-            BeltScript = Belt.GetComponent<ProceduralBelt>();
-            Selection.activeGameObject = Belt;
+            CreateBelt();
+            
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, 10, GroundAndConnectorMask, QueryTriggerInteraction.Collide))
             {
-                Belt.transform.position = hit.point;
                 if (hit.transform.GetComponent<BeltConnector>() != null)
                 {
                     BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
@@ -87,7 +85,7 @@ public class BeltBuilder : MonoBehaviour
                     Vector3 BeltDir = BeltEndVector - BeltStartVector;
                     Debug.DrawLine(BeltStartVector, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Color.magenta);
 
-                    if (hit.transform.GetComponent<BeltConnector>() != null)
+                    if (hit.transform.GetComponent<BeltConnector>() != null && hit.transform.GetComponent<BeltConnector>() != endHookedConnector)
                     {
                         BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
                         BeltStartVector = connector.Pos;
@@ -98,6 +96,9 @@ public class BeltBuilder : MonoBehaviour
                     }
                     else
                     {
+                        Physics.Raycast(ray, out hit, 10, GroundMask);
+                        BeltStartVector = hit.point;
+                        BeltDir = BeltEndVector - BeltStartVector;
                         _startHookedToConnector = false;
                         startHookedConnector = null;
                         Belt.transform.position = BeltEndVector - Belt.transform.forward * BeltDir.magnitude;
@@ -106,12 +107,10 @@ public class BeltBuilder : MonoBehaviour
 
                 } else
                 {
-
-
                     BeltEndVector = hit.point;
                     Vector3 BeltDir = BeltEndVector - BeltStartVector;
 
-                    if (hit.transform.GetComponent<BeltConnector>() != null)
+                    if (hit.transform.GetComponent<BeltConnector>() != null && hit.transform.GetComponent<BeltConnector>() != startHookedConnector)
                     {
                         BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
                         BeltEndVector = connector.Pos;
@@ -121,6 +120,9 @@ public class BeltBuilder : MonoBehaviour
                     }
                     else
                     {
+                        Physics.Raycast(ray, out hit, 10, GroundMask);
+                        BeltEndVector = hit.point;
+                        BeltDir = BeltEndVector - BeltStartVector;
                         _endHookedToConnector = false;
                         endHookedConnector = null;
                         BeltScript.SetPoint(1, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Vector3.right);
@@ -149,7 +151,7 @@ public class BeltBuilder : MonoBehaviour
                 Debug.DrawLine(Vector3.zero, BeltEndVector);
 
                 Belt.transform.LookAt(BeltEndVector);
-
+                
 
             }
           
@@ -206,4 +208,12 @@ public class BeltBuilder : MonoBehaviour
 
     }
 
+    private void CreateBelt()
+    {
+        Belt = Instantiate(BeltPrefab);
+        Belt.GetComponent<Renderer>().material = BeltMat;
+        BeltScript = Belt.GetComponent<ProceduralBelt>();
+        BeltScript.height = BeltHeight;
+        Selection.activeGameObject = Belt;
+    }
 }

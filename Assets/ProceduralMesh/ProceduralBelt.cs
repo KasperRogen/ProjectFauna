@@ -6,7 +6,7 @@ using UnityEngine;
 public class ProceduralBelt : MonoBehaviour
 {
     public float width = 1;
-    public float height = 0.25f;
+    public float height = 2;
     int[] triIndexes = new int[] {
         0,4,1, //TopLeft
         1,4,5, //TopRight
@@ -45,10 +45,10 @@ public class ProceduralBelt : MonoBehaviour
         
 
 
-        pos += Vector3.up * 0.25f;
+        pos += Vector3.up * height;
         vertices[index] = pos - axis * (width / 2);
         vertices[index + 1] = pos + axis * (width / 2);
-        pos -= Vector3.up * 0.25f;
+        pos -= Vector3.up * height;
         vertices[index + 2] = pos - axis * (width / 2);
         vertices[index + 3] = pos + axis * (width / 2);
 
