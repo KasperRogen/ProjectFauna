@@ -6,10 +6,61 @@ using UnityEngine;
 
 public class BeltBuilder : MonoBehaviour
 {
+    class BeltPoint
+    {
+        public GameObject Belt;
+        public float AllowedAngle = 45f;
+        public BeltPoint OtherPoint;
+        public ProceduralBelt ProcBeltScript;
+        Vector3 _pos;
+        Vector3 _axis;
+        public Vector3 pos { get => _pos; set { if (PosChangeAllowed(value)) _pos = value; } }
+        public Vector3 axis { get => _axis; set { if (AxisLocked == false) _axis = value; } }
+        Vector3 LocalAxis;
+        BeltConnector _connector;
+        public BeltConnector connector { get => _connector; set { if (ConnectorLocked == false) _connector = value; } }
+        public int index;
+        public bool PosLocked = false;
+        public bool AxisLocked = false;
+        public bool ConnectorLocked = false;
+        public BeltPoint(int _index)
+        {
+            index = _index;
+        }
+
+        bool PosChangeAllowed(Vector3 pos)
+        {
+
+            Vector3 BeltDir = index == 0 ? OtherPoint.pos - pos : pos - OtherPoint.pos;
+
+            if (connector != null && Vector3.Angle(connector.transform.forward, BeltDir) > AllowedAngle ||
+               OtherPoint.connector != null && Vector3.Angle(OtherPoint.connector.transform.forward, BeltDir) > AllowedAngle ||
+               PosLocked == true)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public void UpdateMesh()
+        {
+            LocalAxis = Belt.transform.InverseTransformDirection(axis);
+            SetMeshPoint(pos, LocalAxis);
+        }
+
+        public void SetMeshPoint(Vector3 pos, Vector3 axis)
+        {
+            ProcBeltScript.SetPoint(index, pos, axis);
+        }
+    }
+
+    public float AllowedAngle = 45f;
     public float BeltHeight = 0.1f;
     public Material BeltMat;
-
-    Vector3 BeltStartVector, BeltEndVector, BeltStartAxis, BeltEndAxis;
+    public GameObject PlaceHolderPrefab;
+    GameObject PlaceHolder;
+    bool _showingPlaceholder = false;
     public GameObject BeltPrefab;
     public GameObject ConnectorPrefab;
     GameObject Belt;
@@ -18,151 +69,80 @@ public class BeltBuilder : MonoBehaviour
     public Vector3 BeltDefaultOrientation = new Vector3(0, 0, -1);
     float dist;
     Vector3 rotAxisV;
-    ProceduralBelt BeltScript;
     public LayerMask GroundMask;
     public LayerMask GroundAndConnectorMask;
     bool _startHookedToConnector = false;
-    BeltConnector startHookedConnector;
 
     bool _endHookedToConnector = false;
-    BeltConnector endHookedConnector;
 
     private bool _isBuilding = false;
 
-    // Start is called before the first frame update
+    public PhysicMaterial PhysMat;
+    BeltPoint StartPoint;
+    BeltPoint EndPoint;
+
+    private void Awake()
+    {
+        CreateStartPoints();
+    }
+
+    void CreateStartPoints()
+    {
+        StartPoint = new BeltPoint(0);
+        EndPoint = new BeltPoint(1);
+
+        StartPoint.OtherPoint = EndPoint;
+        EndPoint.OtherPoint = StartPoint;
+
+        StartPoint.AllowedAngle = AllowedAngle;
+        EndPoint.AllowedAngle = AllowedAngle;
+    }
 
     // Update is called once per frame
     void Update()
     {
-        Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
-        if (Input.GetMouseButtonDown(0))
+
+        if (_isBuilding == false)
         {
-            CreateBelt();
-            
+            Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, 10, GroundAndConnectorMask, QueryTriggerInteraction.Collide))
             {
-                if (hit.transform.GetComponent<BeltConnector>() != null)
+                BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
+
+                if (_showingPlaceholder == false)
                 {
-                    BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
-                    if(connector.Type == ConnectorType.OUTPUT)
-                    {
-                        BeltStartVector = connector.Pos;
-                        _startHookedToConnector = true;
-                        startHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                        Belt.transform.position = startHookedConnector.Pos;
-                        BeltScript.SetPoint(0, startHookedConnector.Pos, Belt.transform.InverseTransformDirection(startHookedConnector.Axis));
+                    _showingPlaceholder = true;
+                    PlaceHolder = Instantiate(PlaceHolderPrefab, Vector3.zero, Quaternion.identity);
+                }
 
-                    } else
-                    {
-                        BeltEndVector = connector.Pos;
-                        _endHookedToConnector = true;
-                        endHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                        BeltScript.SetPoint(1, endHookedConnector.Pos, Belt.transform.InverseTransformDirection(endHookedConnector.Axis));
-                    }
-                    
-
+                if (connector?.IsConnected == false)
+                {
+                    PlaceHolder.transform.position = connector.Pos;
+                    PlaceHolder.transform.rotation = Quaternion.Euler(PlaceHolder.transform.InverseTransformDirection(connector.Axis));
                 }
                 else
                 {
-                    Belt.transform.position = hit.point;
-                    BeltScript.SetPoint(0, hit.point, Vector3.right);
-                    BeltStartVector = hit.point;
+                    PlaceHolder.transform.position = hit.point;
+                    PlaceHolder.transform.LookAt(transform.position);
                 }
-
-                _isBuilding = true;
             }
-        }
-
-        if (Input.GetMouseButton(0) && _isBuilding)
-        {
-            RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, 10, GroundAndConnectorMask))
+            else
             {
-                if(_endHookedToConnector && endHookedConnector.Type == ConnectorType.INPUT)
+                if (_showingPlaceholder)
                 {
-                    BeltStartVector = hit.point;
-                    Vector3 BeltDir = BeltEndVector - BeltStartVector;
-                    Debug.DrawLine(BeltStartVector, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Color.magenta);
-
-                    if (hit.transform.GetComponent<BeltConnector>() != null && hit.transform.GetComponent<BeltConnector>() != endHookedConnector)
-                    {
-                        BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
-                        BeltStartVector = connector.Pos;
-                        _startHookedToConnector = true;
-                        startHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                        Belt.transform.position = startHookedConnector.Pos;
-                        BeltScript.SetPoint(0, startHookedConnector.Pos, Belt.transform.InverseTransformDirection(startHookedConnector.Axis));
-                    }
-                    else
-                    {
-                        Physics.Raycast(ray, out hit, 10, GroundMask);
-                        BeltStartVector = hit.point;
-                        BeltDir = BeltEndVector - BeltStartVector;
-                        _startHookedToConnector = false;
-                        startHookedConnector = null;
-                        Belt.transform.position = BeltEndVector - Belt.transform.forward * BeltDir.magnitude;
-                        BeltScript.SetPoint(0, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Vector3.right);
-                    }
-
-                } else
-                {
-                    BeltEndVector = hit.point;
-                    Vector3 BeltDir = BeltEndVector - BeltStartVector;
-
-                    if (hit.transform.GetComponent<BeltConnector>() != null && hit.transform.GetComponent<BeltConnector>() != startHookedConnector)
-                    {
-                        BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
-                        BeltEndVector = connector.Pos;
-                        _endHookedToConnector = true;
-                        endHookedConnector = hit.transform.GetComponent<BeltConnector>();
-                        BeltScript.SetPoint(1, endHookedConnector.Pos, Belt.transform.InverseTransformDirection(endHookedConnector.Axis));
-                    }
-                    else
-                    {
-                        Physics.Raycast(ray, out hit, 10, GroundMask);
-                        BeltEndVector = hit.point;
-                        BeltDir = BeltEndVector - BeltStartVector;
-                        _endHookedToConnector = false;
-                        endHookedConnector = null;
-                        BeltScript.SetPoint(1, BeltStartVector + Belt.transform.forward * BeltDir.magnitude, Vector3.right);
-                    }
-
+                    Destroy(PlaceHolder);
+                    _showingPlaceholder = false;
                 }
-
-                if (_startHookedToConnector)
-                {
-                    Debug.DrawLine(transform.position, startHookedConnector.Pos, Color.red);
-                    Belt.transform.position = startHookedConnector.Pos;
-                    BeltScript.SetPoint(0, startHookedConnector.Pos, Belt.transform.InverseTransformDirection(startHookedConnector.Axis));
-                }
-                else
-                {
-                    Belt.transform.position = BeltStartVector;
-                    BeltScript.SetPoint(0, BeltStartVector, Vector3.right);
-                }
-
-                if(_endHookedToConnector && endHookedConnector.Type == ConnectorType.INPUT)
-                {
-                    BeltScript.SetPoint(1, endHookedConnector.Pos, Belt.transform.InverseTransformDirection(endHookedConnector.Axis));
-                }
-
-                Debug.DrawLine(Vector3.zero, BeltStartVector);
-                Debug.DrawLine(Vector3.zero, BeltEndVector);
-
-                Belt.transform.LookAt(BeltEndVector);
-                
-
             }
-          
-
         }
 
-        if (Input.GetMouseButtonUp(0))
+
+        if (Input.GetMouseButtonDown(0) && _isBuilding)
         {
-            _isBuilding = false;
-            //Add Collider
+            Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
             BoxCollider collider = Belt.AddComponent<BoxCollider>();
+            collider.material = PhysMat;
             //Add Trigger
             BoxCollider trigger = Belt.AddComponent<BoxCollider>();
             float triggerHeight = 0.1f;
@@ -171,39 +151,186 @@ public class BeltBuilder : MonoBehaviour
             trigger.isTrigger = true;
 
 
-            Vector3 BeltDir = BeltEndVector - BeltStartVector;
-            BeltStartAxis = -Vector3.Cross(BeltDir, Vector3.up).normalized;
-            BeltEndAxis = -Vector3.Cross(BeltDir, Vector3.up).normalized;
+            Vector3 BeltDir = EndPoint.pos - StartPoint.pos;
+            StartPoint.axis = -Vector3.Cross(BeltDir, Vector3.up).normalized;
+            EndPoint.axis = -Vector3.Cross(BeltDir, Vector3.up).normalized;
 
-            if (_startHookedToConnector == false)
-            {
-                GameObject FrontConnector = Instantiate(ConnectorPrefab, Belt.transform.position - Belt.transform.forward * 0.5f, Belt.transform.rotation, Belt.transform);
-                FrontConnector.GetComponent<BeltConnector>().Axis = BeltStartAxis;
-                FrontConnector.GetComponent<BeltConnector>().Pos = BeltStartVector;
-                FrontConnector.GetComponent<BeltConnector>().Type = ConnectorType.INPUT;
-            }
-
-            if(_endHookedToConnector == false)
-            {
-                GameObject BackConnector = Instantiate(ConnectorPrefab, Belt.transform.position +
-                                                                   Belt.transform.forward * 0.5f +
-                                                                   Belt.transform.forward * collider.size.z, Belt.transform.rotation, Belt.transform);
-                BackConnector.GetComponent<BeltConnector>().Axis = BeltEndAxis;
-                BackConnector.GetComponent<BeltConnector>().Pos = BeltEndVector;
-                BackConnector.GetComponent<BeltConnector>().Type = ConnectorType.OUTPUT;
-            }
+            GameObject FrontConnector = Instantiate(ConnectorPrefab, Belt.transform.position - Belt.transform.forward * 0.5f, Belt.transform.rotation, Belt.transform);
+            FrontConnector.GetComponent<BeltConnector>().Axis = StartPoint.axis;
+            FrontConnector.GetComponent<BeltConnector>().Pos = StartPoint.pos;
+            FrontConnector.GetComponent<BeltConnector>().Type = ConnectorType.INPUT;
+            FrontConnector.GetComponent<BeltConnector>().IsConnected = StartPoint.connector == null ? false : true;
 
 
-            _startHookedToConnector = false;
-            startHookedConnector = null;
 
-            _endHookedToConnector = false;
-            endHookedConnector = null;
+            BeltConnector BackBeltConnector = null;
+
+            GameObject BackConnector = Instantiate(ConnectorPrefab, Belt.transform.position +
+                                                               Belt.transform.forward * 0.5f +
+                                                               Belt.transform.forward * collider.size.z, Belt.transform.rotation, Belt.transform);
+
+            BackBeltConnector = BackConnector.GetComponent<BeltConnector>();
+            BackBeltConnector.Axis = EndPoint.axis;
+            BackBeltConnector.Pos = EndPoint.pos;
+            BackBeltConnector.Type = ConnectorType.OUTPUT;
+            BackBeltConnector.IsConnected = EndPoint.connector == null ? false : true;
+
+            if (StartPoint.connector != null)
+                StartPoint.connector.IsConnected = true;
+            if (EndPoint.connector != null)
+                EndPoint.connector.IsConnected = true;
+
 
             Belt.GetComponent<MeshRenderer>().sharedMaterial = BeltMat;
 
+            if (EndPoint.connector != null && StartPoint.connector != null)
+            {
+                stopBuild();
+                CreateStartPoints();
+                return;
+            }
+            
+            StartPoint.connector = null;
+            EndPoint.connector = null;
+
+
+
+
+
+
+            BeltPoint LastEndPoint = EndPoint;
+            CreateStartPoints();
+            StartPoint.pos = LastEndPoint.pos;
+            StartPoint.axis = LastEndPoint.axis;
+            StartPoint.connector = BackBeltConnector;
+            StartPoint.PosLocked = true;
+            StartPoint.AxisLocked = true;
+            StartPoint.ConnectorLocked = true;
+
         }
 
+
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (_showingPlaceholder)
+            {
+                Destroy(PlaceHolder);
+                _showingPlaceholder = false;
+            }
+
+            Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
+            CreateBelt();
+
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit, 10, GroundAndConnectorMask, QueryTriggerInteraction.Collide))
+            {
+                if (hit.transform.GetComponent<BeltConnector>() != null && hit.transform.GetComponent<BeltConnector>().IsConnected == false)
+                {
+                    BeltConnector connector = hit.transform.GetComponent<BeltConnector>();
+
+                    BeltPoint tempPoint = connector.Type == ConnectorType.OUTPUT ? StartPoint : EndPoint;
+
+                    tempPoint.pos = connector.Pos;
+                    tempPoint.connector = connector;
+                    tempPoint.axis = tempPoint.connector.Axis;
+                    tempPoint.PosLocked = true;
+                    tempPoint.AxisLocked = true;
+                    tempPoint.ConnectorLocked = true;
+
+                }
+                else
+                {
+                    StartPoint.pos = hit.point;
+                    StartPoint.axis = Belt.transform.TransformDirection(Vector3.right);
+                    StartPoint.connector = null;
+                    StartPoint.PosLocked = true;
+                }
+
+                _isBuilding = true;
+            }
+        }
+
+        if (_isBuilding)
+        {
+            RaycastHit groundConnectorHit;
+            RaycastHit groundHit;
+            Ray ray = new Ray(Camera.main.transform.position, Camera.main.transform.forward);
+            Physics.Raycast(ray, out groundHit, 10, GroundMask);
+
+            if (Physics.Raycast(ray, out groundConnectorHit, 10, GroundAndConnectorMask))
+            {
+                BeltConnector connector = groundConnectorHit.transform.GetComponent<BeltConnector>();
+
+                BeltPoint tempPoint = EndPoint.connector != null && EndPoint.connector.Type == ConnectorType.INPUT ? StartPoint : EndPoint;
+
+
+                if (connector != null && connector != tempPoint.OtherPoint.connector && connector.IsConnected == false)
+                {
+                    tempPoint.pos = connector.Pos;
+                    tempPoint.connector = groundConnectorHit.transform.GetComponent<BeltConnector>();
+                    tempPoint.axis = tempPoint.connector.Axis;
+                }
+                else
+                {
+                    tempPoint.pos = groundHit.point;
+                    Vector3 BeltDir = EndPoint.pos - tempPoint.pos;
+                    tempPoint.connector = null;
+                    if (EndPoint.connector?.Type == ConnectorType.INPUT)
+                    {
+                        Belt.transform.position = EndPoint.pos - Belt.transform.forward * BeltDir.magnitude;
+                    }
+                    else
+                    {
+                        Belt.transform.position = StartPoint.pos;
+                    }
+                    tempPoint.axis = Belt.transform.TransformDirection(Vector3.right);
+                }
+
+
+
+                if (StartPoint.connector != null)
+                {
+                    Belt.transform.position = StartPoint.connector.Pos;
+                    StartPoint.pos = StartPoint.connector.Pos;
+                    StartPoint.axis = StartPoint.connector.Axis;
+                }
+                else
+                {
+                    Belt.transform.position = StartPoint.pos;
+                    StartPoint.axis = Belt.transform.TransformDirection(Vector3.right);
+                }
+
+                if (EndPoint.connector != null && EndPoint.connector.Type == ConnectorType.INPUT)
+                {
+                    EndPoint.pos = EndPoint.connector.Pos;
+                    EndPoint.axis = EndPoint.connector.Axis;
+                }
+
+                Debug.DrawLine(Vector3.zero, StartPoint.pos);
+                Debug.DrawLine(Vector3.zero, EndPoint.pos);
+
+                Belt.transform.LookAt(EndPoint.pos);
+
+                StartPoint.UpdateMesh();
+                EndPoint.UpdateMesh();
+            }
+
+
+        }
+
+        if (Input.GetMouseButtonDown(1) && _isBuilding)
+        {
+            stopBuild();
+            Destroy(Belt);
+        }
+
+
+        void stopBuild()
+        {
+            CreateStartPoints();
+            _isBuilding = false;
+        }
 
 
     }
@@ -212,8 +339,12 @@ public class BeltBuilder : MonoBehaviour
     {
         Belt = Instantiate(BeltPrefab);
         Belt.GetComponent<Renderer>().material = BeltMat;
-        BeltScript = Belt.GetComponent<ProceduralBelt>();
+        ProceduralBelt BeltScript = Belt.GetComponent<ProceduralBelt>();
         BeltScript.height = BeltHeight;
+        StartPoint.ProcBeltScript = BeltScript;
+        EndPoint.ProcBeltScript = BeltScript;
+        StartPoint.Belt = Belt;
+        EndPoint.Belt = Belt;
         Selection.activeGameObject = Belt;
     }
 }
