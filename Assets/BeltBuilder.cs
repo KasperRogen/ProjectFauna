@@ -147,7 +147,7 @@ public class BeltBuilder : MonoBehaviour
             BoxCollider trigger = Belt.AddComponent<BoxCollider>();
             float triggerHeight = 0.1f;
             trigger.center = new Vector3(0, collider.size.y + triggerHeight / 2, collider.size.z / 2);
-            trigger.size = new Vector3(0.15f, triggerHeight, collider.size.z);
+            trigger.size = new Vector3(0.30f, triggerHeight, collider.size.z);
             trigger.isTrigger = true;
 
 

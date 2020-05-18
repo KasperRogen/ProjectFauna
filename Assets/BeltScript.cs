@@ -40,8 +40,15 @@ public class BeltScript : MonoBehaviour
 
             Debug.DrawLine(Vector3.zero, transform.position + transform.forward);
 
+            Vector3 newPos = rb.position - transform.position;
+            newPos = transform.InverseTransformDirection(newPos);
+            Debug.Log(newPos);
+
+            Debug.DrawRay(rb.position, newPos, Color.red);
+
             rb.velocity = Vector3.Lerp(rb.velocity, 
-                (transform.forward * BeltSpeed) /*+ (CenterPoint - rb.transform.position)*/ * BeltSpeed, Lerpscale);
+                (transform.forward * BeltSpeed) , Lerpscale);
+
         }
         
 
