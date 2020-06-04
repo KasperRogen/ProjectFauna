@@ -93,9 +93,8 @@ public class ProceduralBelt : MonoBehaviour
 
     public void Awake()
     {
-        meshFilter = gameObject.AddComponent<MeshFilter>();
-        MeshRenderer meshRenderer = gameObject.AddComponent<MeshRenderer>();
-        meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
+        meshFilter = gameObject.GetComponent<MeshFilter>();
+        MeshRenderer meshRenderer = gameObject.GetComponent<MeshRenderer>();
         mesh = new Mesh();
     }
 

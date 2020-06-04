@@ -4,39 +4,60 @@ using UnityEngine;
 
 public class FootIK : MonoBehaviour
 {
-
+    public WalkingAgent WalkingAgent;
     public float FootHeight = 0.25f;
+    Transform _transform;
+    public FootIK _childIK;
+    public bool IsRoot;
+    bool hasChild = false;
 
     // Start is called before the first frame update
     void Start()
     {
-        
+        _transform = transform;
+        if (IsRoot)
+        {
+            StartCoroutine(UpdateFootIKs());
+        }
+
+        if(transform.childCount > 0)
+        {
+            _childIK = _transform.GetChild(0).GetComponent<FootIK>();
+            hasChild = true;
+        }
     }
 
-    private void Update()
+    IEnumerator UpdateFootIKs()
     {
-        if(transform.localPosition.y > 0.01f)
+        yield return new WaitForSeconds(1);
+        bool t = true;
+        while (t)
         {
-            transform.localPosition += Vector3.down * Time.deltaTime;
-        } else
-        {
-            transform.localPosition += Vector3.up * Time.deltaTime;
+            yield return new WaitForEndOfFrame();
+            if(WalkingAgent.Speed > 0f)
+            MoveToGround();
         }
     }
 
     // Update is called once per frame
-    void LateUpdate()
+    public void MoveToGround()
     {
         float dist;
         RaycastHit hit;
 
-        if (Physics.Raycast(transform.position, Vector3.down, out hit)){
+        if (Physics.Raycast(_transform.position, Vector3.down, out hit)){
 
-            Debug.DrawLine(transform.position, hit.point, Color.yellow);
-            dist = transform.position.y - hit.point.y;
-            Vector3 CurrPos = transform.position;
+            Debug.DrawLine(_transform.position, hit.point, Color.yellow);
+            dist = _transform.position.y - hit.point.y;
+            Vector3 CurrPos = _transform.position;
             CurrPos.y -= dist - FootHeight;
-            transform.position = CurrPos;
+            _transform.position = CurrPos;
+        }
+
+        if (hasChild)
+        {
+                _childIK.MoveToGround();
+                transform.LookAt(_childIK.transform);
         }
     }
 }
